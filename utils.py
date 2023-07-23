@@ -1,9 +1,14 @@
 
 from tqdm import tqdm
+import os
+
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import torchvision.transforms as transforms
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
-import os
+from dataset import BrainTumorDataset
 
 writer = SummaryWriter("runs")
 
@@ -20,7 +25,39 @@ def save_checkpoint(state, epoch, val_acc, dice_scrore, save_folder="runs/checkp
 
 def load_checkpoint(checkpoint, model):
     print("=> Loading checkpoint")
-    model.load_state_dict(checkpoint["state_dict"])
+    model.load_state_dict(torch.load(checkpoint))
+    
+    
+
+def load_data(root="dataset", img_size=224):
+    
+    train_transforms = A.Compose([
+        A.Resize(height=img_size, width=img_size),
+        A.Rotate(limit=35, p=1.0),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.1),
+        A.Normalize(
+            mean=[0.0, 0.0, 0.0],
+            std=[1.0, 1.0, 1.0],
+            max_pixel_value=255.0
+        ),
+        ToTensorV2()
+    ])
+    
+    val_transforms = A.Compose([
+        A.Resize(height=img_size, width=img_size),
+        A.Normalize(
+            mean=[0.0, 0.0, 0.0],
+            std=[1.0, 1.0, 1.0],
+            max_pixel_value=255.0
+        ),
+        ToTensorV2()
+    ])
+    
+    train_dataset = BrainTumorDataset(root=root, part="train", transforms=train_transforms)
+    val_dataset = BrainTumorDataset(root=root, part="valid", transforms=val_transforms)
+    
+    return train_dataset, val_dataset
 
 def train_epoch(net, epoch, dataloader,
                 device, optimizer, criterion):
@@ -75,4 +112,5 @@ def val_epoch(net, epoch, dataloader, device):
                       dice_score,
                       epoch)
             
+    return val_acc, dice_score
             
